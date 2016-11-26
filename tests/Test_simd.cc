@@ -127,7 +127,7 @@ template<class scal, class vec,class functor >
 void Tester(const functor &func)
 {
   GridSerialRNG          sRNG;
-  sRNG.SeedRandomDevice();
+  sRNG.SeedFixedIntegers({1,2,3,4,5});
   
   int Nsimd = vec::Nsimd();
 
@@ -185,7 +185,7 @@ template<class reduced,class scal, class vec,class functor >
 void ReductionTester(const functor &func)
 {
   GridSerialRNG          sRNG;
-  sRNG.SeedRandomDevice();
+  sRNG.SeedFixedIntegers({1,2,3,4,5});
   
   int Nsimd = vec::Nsimd();
 
@@ -264,7 +264,7 @@ template<class scal, class vec,class functor >
 void PermTester(const functor &func)
 {
   GridSerialRNG          sRNG;
-  sRNG.SeedRandomDevice();
+  sRNG.SeedFixedIntegers({1,2,3,4,5});
   
   int Nsimd = vec::Nsimd();
 

@@ -43,10 +43,10 @@ int main (int argc, char ** argv)
 
   std::vector<int> seeds({1,2,3,4});
 
-  GridSerialRNG             sRNG;   sRNG.SeedRandomDevice();
+  GridSerialRNG             sRNG;   sRNG.SeedFixedIntegers({1,2,3,4,5});
   GridSerialRNG            fsRNG;  fsRNG.SeedFixedIntegers(seeds);
 
-  GridParallelRNG           pRNG(&Grid);   pRNG.SeedRandomDevice();
+  GridParallelRNG           pRNG(&Grid);   pRNG.SeedFixedIntegers({1,2,3,4,5});
   GridParallelRNG          fpRNG(&Grid);  fpRNG.SeedFixedIntegers(seeds);
 
   SpinMatrix rnd  ; 

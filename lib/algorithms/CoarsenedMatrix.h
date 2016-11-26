@@ -427,7 +427,7 @@ PARALLEL_FOR_LOOP
 	A[p]=zero;
       }
 
-      GridParallelRNG  RNG(Grid()); RNG.SeedRandomDevice();
+      GridParallelRNG  RNG(Grid()); RNG.SeedFixedIntegers({1,2,3,5,8,111});
       Lattice<iScalar<CComplex> > val(Grid()); random(RNG,val);
 
       Complex one(1.0);

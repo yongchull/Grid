@@ -54,8 +54,8 @@ int main (int argc, char ** argv)
   GridSerialRNG     sRNGa;
   GridSerialRNG     sRNGb;
 
-  pRNGa.SeedRandomDevice();
-  sRNGa.SeedRandomDevice();
+  pRNGa.SeedFixedIntegers({1,2,3,4,5});
+  sRNGa.SeedFixedIntegers({1,2,3,4,5});
   
   std::string rfile("./ckpoint_rng.4000");
   NerscIO::writeRNGState(sRNGa,pRNGa,rfile);

@@ -50,7 +50,7 @@ int main (int argc, char ** argv)
   std::vector<int> seeds({1,2,3,4});
 
   GridParallelRNG          pRNG(&Grid);
-  pRNG.SeedRandomDevice();
+  pRNG.SeedFixedIntegers({1,2,3,4,5});
 
   LatticeFermion phi        (&Grid); gaussian(pRNG,phi);
   LatticeFermion Mphi       (&Grid); 

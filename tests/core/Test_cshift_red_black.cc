@@ -47,7 +47,7 @@ int main (int argc, char ** argv)
   GridCartesian         Fine  (latt_size,simd_layout,mpi_layout);
   GridRedBlackCartesian RBFine(latt_size,simd_layout,mpi_layout,mask,1);
 
-  GridParallelRNG      FineRNG(&Fine);  FineRNG.SeedRandomDevice();
+  GridParallelRNG      FineRNG(&Fine);  FineRNG.SeedFixedIntegers({1,2,3,4,5});
 
   LatticeComplex U(&Fine);
   LatticeComplex ShiftU(&Fine);

@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
 
   // Projectors 
   GridParallelRNG gridRNG(grid);
-  gridRNG.SeedRandomDevice();
+  gridRNG.SeedFixedIntegers({1,2,3,4,5});
   SU3Adjoint::LatticeAdjMatrix Gauss(grid);
   SU3::LatticeAlgebraVector ha(grid);
   SU3::LatticeAlgebraVector hb(grid);

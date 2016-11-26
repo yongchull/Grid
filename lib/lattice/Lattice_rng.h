@@ -67,27 +67,6 @@ namespace Grid {
     return multiplicity;
   }
 
-  // Wrap seed_seq to give common interface with random_device
-  class fixedSeed {
-  public:
-
-    typedef std::seed_seq::result_type result_type;
-
-    std::seed_seq src;
-    
-    fixedSeed(const std::vector<int> &seeds) : src(seeds.begin(),seeds.end()) {};
-
-    result_type operator () (void){
-
-      std::vector<result_type> list(1);
-
-      src.generate(list.begin(),list.end());
-
-      return list[0];
-
-    }
-
-  };
 
   // real scalars are one component
   template<class scalar,class distribution,class generator> void fillScalar(scalar &s,distribution &dist,generator & gen)
@@ -152,9 +131,8 @@ namespace Grid {
     // place a barrier/broadcast in the fill routine
     template<class source> void Seed(source &src)
     {
-      typename source::result_type init = src();
-      CartesianCommunicator::BroadcastWorld(0,(void *)&init,sizeof(init));
-      _generators[0] = RngEngine(init);
+      typedef typename source::result_type word;
+      _generators[0] = RngEngine(src);
       _seeded=1;
     }    
 
@@ -240,12 +218,9 @@ namespace Grid {
     }
 
 
-    void SeedRandomDevice(void){
-      std::random_device rd;
-      Seed(rd);
-    }
     void SeedFixedIntegers(const std::vector<int> &seeds){
-      fixedSeed src(seeds);
+      CartesianCommunicator::BroadcastWorld(0,(void *)&seeds[0],sizeof(int)*seeds.size());
+      std::seed_seq src(seeds.begin(),seeds.end());
       Seed(src);
     }
 
@@ -282,12 +257,7 @@ namespace Grid {
     template<class source> void Seed(source &src)
     {
       std::vector<int> gcoor;
-
       int gsites = _grid->_gsites;
-
-      typename source::result_type init = src();
-      RngEngine pseeder(init);
-      std::uniform_int_distribution<uint64_t> ui;
 
       for(int gidx=0;gidx<gsites;gidx++){
 
@@ -296,19 +266,9 @@ namespace Grid {
 	_grid->GlobalCoorToRankIndex(rank,o_idx,i_idx,gcoor);
         
 	int l_idx=generator_idx(o_idx,i_idx);
-
-	const int num_rand_seed=16;
-	std::vector<int> site_seeds(num_rand_seed);
-	for(int i=0;i<site_seeds.size();i++){
-	  site_seeds[i]= ui(pseeder);
-	}
-
-	_grid->Broadcast(0,(void *)&site_seeds[0],sizeof(int)*site_seeds.size());
-
+	RngEngine siteEngine(src);
 	if( rank == _grid->ThisRank() ){
-	  fixedSeed ssrc(site_seeds);
-	  typename source::result_type sinit = ssrc();
-	  _generators[l_idx] = RngEngine(sinit);
+	  _generators[l_idx] = siteEngine;
 	}
       }
       _seeded=1;
@@ -354,12 +314,9 @@ PARALLEL_FOR_LOOP
       }
     };
 
-    void SeedRandomDevice(void){
-      std::random_device rd;
-      Seed(rd);
-    }
     void SeedFixedIntegers(const std::vector<int> &seeds){
-      fixedSeed src(seeds);
+      CartesianCommunicator::BroadcastWorld(0,(void *)&seeds[0],sizeof(int)*seeds.size());
+      std::seed_seq src(seeds.begin(),seeds.end());
       Seed(src);
     }
 

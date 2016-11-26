@@ -48,10 +48,10 @@ int main (int argc, char ** argv)
   GridCartesian     Grid(latt_size,simd_layout,mpi_layout);
 
   GridParallelRNG          pRNG(&Grid);
-  pRNG.SeedRandomDevice();
+  pRNG.SeedFixedIntegers({1,2,3,4,5});
 
   GridSerialRNG            sRNG;
-  sRNG.SeedRandomDevice();
+  sRNG.SeedFixedIntegers({1,2,3,4,5});
 
   SpinMatrix ident; ident=zero;
   SpinMatrix rnd  ; random(sRNG,rnd);

@@ -69,7 +69,7 @@ int main (int argc, char ** argv)
   std::vector<int> seeds({1,2,3,4});
   GridParallelRNG          pRNG(&Grid);
   pRNG.SeedFixedIntegers(seeds);
-  //  pRNG.SeedRandomDevice();
+  //  pRNG.SeedFixedIntegers({1,2,3,4,5});
 
   LatticeFermion src   (&Grid); random(pRNG,src);
   LatticeFermion result(&Grid); result=zero;
