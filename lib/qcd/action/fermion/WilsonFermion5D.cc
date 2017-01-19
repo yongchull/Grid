@@ -403,7 +403,7 @@ void WilsonFermion5D<Impl>::DhopInternal(StencilImpl & st, LebesgueOrder &lo,
   int LLs = in._grid->_rdimensions[0];
   
   DhopCommTime-=usecond();
-  st.HaloExchange(in,compressor);
+  st.HaloExchangeOpt(in,compressor);
   DhopCommTime+=usecond();
   
   DhopComputeTime-=usecond();
@@ -415,7 +415,7 @@ void WilsonFermion5D<Impl>::DhopInternal(StencilImpl & st, LebesgueOrder &lo,
       int sF = LLs * sU;
       Kernels::DiracOptDhopSiteDag(st, lo, U, st.CommBuf(), sF, sU, LLs, 1, in, out);
     }
-#ifdef AVX512
+#ifdef AVX512_SWITCHOFF
   } else if (stat.is_init() ) {
 
     int nthreads;
@@ -437,12 +437,23 @@ void WilsonFermion5D<Impl>::DhopInternal(StencilImpl & st, LebesgueOrder &lo,
     stat.accum(nthreads);
 #endif
   } else {
+#if 0
     PARALLEL_FOR_LOOP
     for (int ss = 0; ss < U._grid->oSites(); ss++) {
       int sU = ss;
       int sF = LLs * sU;
       Kernels::DiracOptDhopSite(st,lo,U,st.CommBuf(),sF,sU,LLs,1,in,out);
     }
+#else
+#pragma omp parallel 
+    {
+      int len = U._grid->oSites();
+      int me, myoff,mywork;
+      GridThread::GetWorkBarrier(len,me, mywork,myoff);
+      int sF = LLs * myoff;
+      Kernels::DiracOptDhopSite(st,lo,U,st.CommBuf(),sF,myoff,LLs,mywork,in,out);
+    }
+#endif
   }
   DhopComputeTime+=usecond();
 }
