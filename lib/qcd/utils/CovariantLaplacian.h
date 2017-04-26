@@ -75,23 +75,38 @@ struct LaplacianParams : Serializable {
 
 template <class Impl>
 class LaplacianAdjointField: public Metric<typename Impl::Field> {
+  public:
+  INHERIT_GIMPL_TYPES(Impl);
+
+  private:
   OperatorFunction<typename Impl::Field> &Solver;
   LaplacianParams param;
   MultiShiftFunction PowerHalf;    
   MultiShiftFunction PowerInvHalf;    
 
+  //typedef typename Impl::Field::vector_object vobj;
+  typedef typename GaugeLinkField::vector_object vobj;
+  typedef CartesianStencil<vobj,vobj> Stencil;
+
+  SimpleCompressor<vobj> compressor;
+  int npoint = 8;
+  std::vector<int> directions    = {0,1,2,3,0,1,2,3};  // forcing 4 dimensions
+  std::vector<int> displacements = {1,1,1,1, -1,-1,-1,-1};
+
+  Stencil laplace_stencil;
+
+
  public:
-  INHERIT_GIMPL_TYPES(Impl);
 
   LaplacianAdjointField(GridBase* grid, OperatorFunction<GaugeField>& S, LaplacianParams& p, const RealD k = 1.0)
-      : U(Nd, grid), Solver(S), param(p), kappa(k){
+      : U(2*Nd, grid), Uadj(2*Nd,grid), Solver(S), param(p), kappa(k), laplace_stencil(grid, npoint, 0, directions, displacements){
         AlgRemez remez(param.lo,param.hi,param.precision);
         std::cout<<GridLogMessage << "Generating degree "<<param.degree<<" for x^(1/2)"<<std::endl;
         remez.generateApprox(param.degree,1,2);
         PowerHalf.Init(remez,param.tolerance,false);
         PowerInvHalf.Init(remez,param.tolerance,true);
         
-
+        assert(Nd==4); // forced by the stencil
       };
 
   void Mdir(const GaugeField&, GaugeField&, int, int){ assert(0);}
@@ -99,11 +114,14 @@ class LaplacianAdjointField: public Metric<typename Impl::Field> {
 
   void ImportGauge(const GaugeField& _U) {
     for (int mu = 0; mu < Nd; mu++) {
-      U[mu] = PeekIndex<LorentzIndex>(_U, mu);
+      U[mu]      = PeekIndex<LorentzIndex>(_U, mu);
+      U[mu+4]    = Cshift(U[mu], mu, -1);// U (x-mu)
+      Uadj[mu]   = adj(U[mu]);
+      Uadj[mu+4] = adj(U[mu+4]);
     }
   }
 
-  void M(const GaugeField& in, GaugeField& out) {
+  void Mref(const GaugeField& in, GaugeField& out) {
     // in is an antihermitian matrix
     // test
     //GaugeField herm = in + adj(in);
@@ -126,6 +144,62 @@ class LaplacianAdjointField: public Metric<typename Impl::Field> {
       PokeIndex<LorentzIndex>(out, out_nu, nu);
     }
   }
+
+void M(const GaugeField& in, GaugeField& out) {
+    // in is an antihermitian matrix test
+    // GaugeField herm = in + adj(in);
+    // std::cout << "AHermiticity: " << norm2(herm) << std::endl;
+
+    GaugeLinkField sum(in._grid);
+    GaugeLinkField out_nu(out._grid);
+    for (int nu = 0; nu < Nd; nu++) {
+      sum = zero;
+      GaugeLinkField in_nu = PeekIndex<LorentzIndex>(in, nu);
+      laplace_stencil.HaloExchange(in_nu, compressor);
+      for (int mu = 0; mu < Nd; mu++) {
+        PARALLEL_FOR_LOOP
+        for (int i = 0; i < in_nu._grid->oSites(); i++) {
+          int permute_type;
+          StencilEntry *SEup, *SEdown;
+          vobj temp2, *temp;
+
+          SEup = laplace_stencil.GetEntry(permute_type, mu, i);
+          if (SEup->_is_local) {
+            temp = &in_nu._odata[SEup->_offset];
+            if (SEup->_permute) {
+              permute(temp2, *temp, permute_type);
+              sum._odata[i] += U[mu]._odata[i] * temp2 * Uadj[mu]._odata[i] - 2.0 * in_nu._odata[i];
+            }
+            else {
+              sum._odata[i] += U[mu]._odata[i] * (*temp) * Uadj[mu]._odata[i] - 2.0 * in_nu._odata[i];
+            }
+          }
+          else {
+            sum._odata[i] += U[mu]._odata[i] * laplace_stencil.CommBuf()[SEup->_offset] * Uadj[mu]._odata[i] - 2.0 * in_nu._odata[i];
+          }
+
+          SEdown = laplace_stencil.GetEntry(permute_type, mu+4, i);
+          if (SEdown->_is_local) {
+            temp = &in_nu._odata[SEdown->_offset];
+            if (SEdown->_permute) {
+              permute(temp2, *temp, permute_type);
+              sum._odata[i] += Uadj[mu+4]._odata[i] * temp2 * U[mu+4]._odata[i];
+            }
+            else {
+              sum._odata[i] += Uadj[mu+4]._odata[i] * (*temp) * U[mu+4]._odata[i];
+            }
+          }
+          else {
+            sum._odata[i] += Uadj[mu+4]._odata[i] * laplace_stencil.CommBuf()[SEdown->_offset] * U[mu+4]._odata[i];
+          }
+        } // for loop
+      }  // mu loop
+      out_nu = (1.0 - kappa) * in_nu - kappa / (double(4 * Nd)) * sum;
+      PokeIndex<LorentzIndex>(out, out_nu, nu);
+    }
+  }
+
+
 
   void MDeriv(const GaugeField& in, GaugeField& der) {
     // in is anti-hermitian
@@ -189,10 +263,11 @@ class LaplacianAdjointField: public Metric<typename Impl::Field> {
  private:
   RealD kappa;
   std::vector<GaugeLinkField> U;
+  std::vector<GaugeLinkField> Uadj;
 };
 
 
-// This is just for debuggin purposes
+// This is just for debugging purposes
 // not meant to be used by the final users
 
 template <class Impl>
