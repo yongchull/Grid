@@ -168,7 +168,7 @@ void M(const GaugeField& in, GaugeField& out) {
 
           SEup = laplace_stencil.GetEntry(permute_type, mu, i);
           if (SEup->_is_local) {
-            temp = &in._odata[SEup->_offset](nu);
+            temp = const_cast<internal_type*>(&in._odata[SEup->_offset](nu));
             if (SEup->_permute) {
               permute(temp2, *temp, permute_type);
               sum += U[mu]._odata[i]() *   temp2 * Uadj[mu]._odata[i]() - 2.0 * in._odata[i](nu);
@@ -183,7 +183,7 @@ void M(const GaugeField& in, GaugeField& out) {
           
           SEdown = laplace_stencil.GetEntry(permute_type, mu+4, i);
           if (SEdown->_is_local) {
-            temp = &in._odata[SEdown->_offset](nu);
+            temp = const_cast<internal_type*>(&in._odata[SEdown->_offset](nu));
             if (SEdown->_permute) {
               permute(temp2, *temp, permute_type);
               sum += Uadj[mu+4]._odata[i]() *   temp2 * U[mu+4]._odata[i]();
