@@ -85,7 +85,7 @@ class LaplacianAdjointField: public Metric<typename Impl::Field> {
   MultiShiftFunction PowerInvHalf;    
 
   //typedef typename Impl::Field::vector_object vobj;
-  typedef typename GaugeLinkField::vector_object vobj;
+  typedef typename Impl::Field::vector_object vobj;
   typedef CartesianStencil<vobj,vobj> Stencil;
 
   SimpleCompressor<vobj> compressor;
@@ -107,6 +107,7 @@ class LaplacianAdjointField: public Metric<typename Impl::Field> {
         PowerInvHalf.Init(remez,param.tolerance,true);
         
         assert(Nd==4); // forced by the stencil
+        factor = kappa / (double(4 * Nd));
       };
 
   void Mdir(const GaugeField&, GaugeField&, int, int){ assert(0);}
@@ -150,53 +151,54 @@ void M(const GaugeField& in, GaugeField& out) {
     // GaugeField herm = in + adj(in);
     // std::cout << "AHermiticity: " << norm2(herm) << std::endl;
 
-    GaugeLinkField sum(in._grid);
-    GaugeLinkField out_nu(out._grid);
-    for (int nu = 0; nu < Nd; nu++) {
-      sum = zero;
-      GaugeLinkField in_nu = PeekIndex<LorentzIndex>(in, nu);
-      laplace_stencil.HaloExchange(in_nu, compressor);
-      for (int mu = 0; mu < Nd; mu++) {
-        PARALLEL_FOR_LOOP
-        for (int i = 0; i < in_nu._grid->oSites(); i++) {
-          int permute_type;
-          StencilEntry *SEup, *SEdown;
-          vobj temp2, *temp;
+    typedef typename std::remove_const<typename std::remove_reference<decltype(in._odata[0](0))>::type>::type  internal_type;
+    laplace_stencil.HaloExchange(in, compressor);
+    
+    PARALLEL_FOR_LOOP
+    for (int i = 0; i < in._grid->oSites(); i++) {
+      int permute_type;
+      StencilEntry *SEup, *SEdown;
+      internal_type temp2, *temp;
+      internal_type sum;
+
+      for (int nu = 0; nu < Nd; nu++) {
+        sum = zero;
+
+        for (int mu = 0; mu < Nd; mu++) {
 
           SEup = laplace_stencil.GetEntry(permute_type, mu, i);
           if (SEup->_is_local) {
-            temp = &in_nu._odata[SEup->_offset];
+            temp = &in._odata[SEup->_offset](nu);
             if (SEup->_permute) {
               permute(temp2, *temp, permute_type);
-              sum._odata[i] += U[mu]._odata[i] * temp2 * Uadj[mu]._odata[i] - 2.0 * in_nu._odata[i];
+              sum += U[mu]._odata[i]() *   temp2 * Uadj[mu]._odata[i]() - 2.0 * in._odata[i](nu);
             }
             else {
-              sum._odata[i] += U[mu]._odata[i] * (*temp) * Uadj[mu]._odata[i] - 2.0 * in_nu._odata[i];
+              sum += U[mu]._odata[i]() * (*temp) * Uadj[mu]._odata[i]() - 2.0 * in._odata[i](nu);
             }
           }
           else {
-            sum._odata[i] += U[mu]._odata[i] * laplace_stencil.CommBuf()[SEup->_offset] * Uadj[mu]._odata[i] - 2.0 * in_nu._odata[i];
+            sum += U[mu]._odata[i]() * laplace_stencil.CommBuf()[SEup->_offset](nu) * Uadj[mu]._odata[i]() - 2.0 * in._odata[i](nu);
           }
-
+          
           SEdown = laplace_stencil.GetEntry(permute_type, mu+4, i);
           if (SEdown->_is_local) {
-            temp = &in_nu._odata[SEdown->_offset];
+            temp = &in._odata[SEdown->_offset](nu);
             if (SEdown->_permute) {
               permute(temp2, *temp, permute_type);
-              sum._odata[i] += Uadj[mu+4]._odata[i] * temp2 * U[mu+4]._odata[i];
+              sum += Uadj[mu+4]._odata[i]() *   temp2 * U[mu+4]._odata[i]();
             }
             else {
-              sum._odata[i] += Uadj[mu+4]._odata[i] * (*temp) * U[mu+4]._odata[i];
+              sum += Uadj[mu+4]._odata[i]() * (*temp) * U[mu+4]._odata[i]();
             }
           }
           else {
-            sum._odata[i] += Uadj[mu+4]._odata[i] * laplace_stencil.CommBuf()[SEdown->_offset] * U[mu+4]._odata[i];
+            sum += Uadj[mu+4]._odata[i]() * laplace_stencil.CommBuf()[SEdown->_offset](nu) * U[mu+4]._odata[i]();
           }
-        } // for loop
-      }  // mu loop
-      out_nu = (1.0 - kappa) * in_nu - kappa / (double(4 * Nd)) * sum;
-      PokeIndex<LorentzIndex>(out, out_nu, nu);
-    }
+        } // mu loop
+        out._odata[i](nu) = (1.0 - kappa) * in._odata[i](nu) - factor * sum;
+      }  // nu loop
+    } // parallel for , i loop
   }
 
 
@@ -264,6 +266,7 @@ void M(const GaugeField& in, GaugeField& out) {
   RealD kappa;
   std::vector<GaugeLinkField> U;
   std::vector<GaugeLinkField> Uadj;
+  RealD factor;
 };
 
 
