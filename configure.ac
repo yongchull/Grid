@@ -6,7 +6,7 @@ AC_CANONICAL_TARGET
 AM_INIT_AUTOMAKE(subdir-objects)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([lib/Grid.h])
-AC_CONFIG_HEADERS([lib/Config.h])
+AC_CONFIG_HEADERS([lib/Config.h],[sed -i 's|PACKAGE_|GRID_|' lib/Config.h])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 ################ Get git info
@@ -70,6 +70,13 @@ AC_ARG_WITH([fftw],
             [AM_CXXFLAGS="-I$with_fftw/include $AM_CXXFLAGS"]
             [AM_LDFLAGS="-L$with_fftw/lib $AM_LDFLAGS"])
 
+############### LIME
+AC_ARG_WITH([lime],
+            [AS_HELP_STRING([--with-lime=prefix],
+            [try this for a non-standard install prefix of the LIME library])],
+            [AM_CXXFLAGS="-I$with_lime/include $AM_CXXFLAGS"]
+            [AM_LDFLAGS="-L$with_lime/lib $AM_LDFLAGS"])
+
 ############### lapack 
 AC_ARG_ENABLE([lapack],
     [AC_HELP_STRING([--enable-lapack=yes|no|prefix], [enable LAPACK])], 
@@ -84,6 +91,18 @@ case ${ac_LAPACK} in
         AM_CXXFLAGS="-I$ac_LAPACK/include $AM_CXXFLAGS"
         AM_LDFLAGS="-L$ac_LAPACK/lib $AM_LDFLAGS"
         AC_DEFINE([USE_LAPACK],[1],[use LAPACK]);;
+esac
+
+############### FP16 conversions
+AC_ARG_ENABLE([sfw-fp16],
+    [AC_HELP_STRING([--enable-sfw-fp16=yes|no], [enable software fp16 comms])], 
+    [ac_SFW_FP16=${enable_sfw_fp16}], [ac_SFW_FP16=yes])
+case ${ac_SFW_FP16} in
+    yes)
+      AC_DEFINE([SFW_FP16],[1],[software conversion to fp16]);;
+    no);;
+    *)
+      AC_MSG_ERROR(["SFW FP16 option not supported ${ac_SFW_FP16}"]);;
 esac
 
 ############### MKL
@@ -155,6 +174,14 @@ AC_SEARCH_LIBS([fftw_execute], [fftw3],
                [AC_DEFINE([HAVE_FFTW], [1], [Define to 1 if you have the `FFTW' library])]
                [have_fftw=true])
 
+AC_SEARCH_LIBS([limeCreateReader], [lime],
+               [AC_DEFINE([HAVE_LIME], [1], [Define to 1 if you have the `LIME' library])]
+               [have_lime=true],
+	       [AC_MSG_WARN(C-LIME library was not found in your system.
+In order to use ILGG file format please install or provide the correct path to your installation
+Info at: http://usqcd.jlab.org/usqcd-docs/c-lime/)])
+
+
 AC_SEARCH_LIBS([H5Fopen], [hdf5_cpp],
                [AC_DEFINE([HAVE_HDF5], [1], [Define to 1 if you have the `HDF5' library])]
                [have_hdf5=true]
@@ -163,15 +190,6 @@ AM_CONDITIONAL(BUILD_HDF5, [ test "${have_hdf5}X" == "trueX" ])
 
 CXXFLAGS=$CXXFLAGS_CPY
 LDFLAGS=$LDFLAGS_CPY
-
-AC_CHECK_LIB([lime],[limeCreateReader],
-  [AC_DEFINE([HAVE_LIME],[1],[Define to 1 if you have the `LIME' library (-llime).])]
-  [have_lime=true]
-  [LIBS="$LIBS -llime"],
-  [AC_MSG_WARN(C-LIME library was not found in your system.
-In order to use ILGG file format please install or provide the correct path to your installation [default search path ~/lime/]
-Info at: http://usqcd.jlab.org/usqcd-docs/c-lime/)])
-
 
 ############### SIMD instruction selection
 AC_ARG_ENABLE([simd],[AC_HELP_STRING([--enable-simd=code],
@@ -188,19 +206,26 @@ case ${ax_cv_cxx_compiler_vendor} in
     case ${ac_SIMD} in
       SSE4)
         AC_DEFINE([SSE4],[1],[SSE4 intrinsics])
-        SIMD_FLAGS='-msse4.2';;
+	case ${ac_SFW_FP16} in
+	  yes)
+	  SIMD_FLAGS='-msse4.2';;
+	  no)
+	  SIMD_FLAGS='-msse4.2 -mf16c';;
+	  *)
+          AC_MSG_ERROR(["SFW_FP16 must be either yes or no value ${ac_SFW_FP16} "]);;
+	esac;;
       AVX)
         AC_DEFINE([AVX1],[1],[AVX intrinsics])
-        SIMD_FLAGS='-mavx';;
+        SIMD_FLAGS='-mavx -mf16c';;
       AVXFMA4)
         AC_DEFINE([AVXFMA4],[1],[AVX intrinsics with FMA4])
-        SIMD_FLAGS='-mavx -mfma4';;
+        SIMD_FLAGS='-mavx -mfma4 -mf16c';;
       AVXFMA)
         AC_DEFINE([AVXFMA],[1],[AVX intrinsics with FMA3])
-        SIMD_FLAGS='-mavx -mfma';;
+        SIMD_FLAGS='-mavx -mfma -mf16c';;
       AVX2)
         AC_DEFINE([AVX2],[1],[AVX2 intrinsics])
-        SIMD_FLAGS='-mavx2 -mfma';;
+        SIMD_FLAGS='-mavx2 -mfma -mf16c';;
       AVX512)
         AC_DEFINE([AVX512],[1],[AVX512 intrinsics])
         SIMD_FLAGS='-mavx512f -mavx512pf -mavx512er -mavx512cd';;
@@ -333,7 +358,7 @@ AM_CONDITIONAL(BUILD_COMMS_NONE,  [ test "${comms_type}X" == "noneX" ])
 ############### RNG selection
 AC_ARG_ENABLE([rng],[AC_HELP_STRING([--enable-rng=ranlux48|mt19937|sitmo],\
 	            [Select Random Number Generator to be used])],\
-	            [ac_RNG=${enable_rng}],[ac_RNG=ranlux48])
+	            [ac_RNG=${enable_rng}],[ac_RNG=sitmo])
 
 case ${ac_RNG} in
      ranlux48)
@@ -413,6 +438,8 @@ AC_CONFIG_FILES(tests/hadrons/Makefile)
 AC_CONFIG_FILES(tests/hmc/Makefile)
 AC_CONFIG_FILES(tests/solver/Makefile)
 AC_CONFIG_FILES(tests/qdpxx/Makefile)
+AC_CONFIG_FILES(tests/smearing/Makefile)
+AC_CONFIG_FILES(tests/testu01/Makefile)
 AC_CONFIG_FILES(benchmarks/Makefile)
 AC_CONFIG_FILES(extras/Makefile)
 AC_CONFIG_FILES(extras/Hadrons/Makefile)
@@ -423,7 +450,6 @@ git_commit=`cd $srcdir && ./scripts/configure.commit`
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Summary of configuration for $PACKAGE v$VERSION
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 ----- GIT VERSION -------------------------------------
 $git_commit
 
@@ -439,6 +465,7 @@ SIMD                        : ${ac_SIMD}${SIMD_GEN_WIDTH_MSG}
 Threading                   : ${ac_openmp} 
 Communications type         : ${comms_type}
 Default precision           : ${ac_PRECISION}
+Software FP16 conversion    : ${ac_SFW_FP16}
 RNG choice                  : ${ac_RNG} 
 GMP                         : `if test "x$have_gmp" = xtrue; then echo yes; else echo no; fi`
 LAPACK                      : ${ac_LAPACK}

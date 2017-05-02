@@ -270,6 +270,7 @@ void M(const GaugeField& in, GaugeField& out) {
 };
 
 
+
 // This is just for debugging purposes
 // not meant to be used by the final users
 
@@ -318,6 +319,7 @@ class LaplacianAlgebraField {
   RealD kappa;
   std::vector<GaugeLinkField> U;
 };
+
 
 
 }

@@ -1,4 +1,4 @@
-    /*************************************************************************************
+/*************************************************************************************
 
     Grid physics library, www.github.com/paboyle/Grid 
 
@@ -6,8 +6,8 @@
 
     Copyright (C) 2015
 
-Author: Peter Boyle <paboyle@ph.ed.ac.uk>
-Author: paboyle <paboyle@ph.ed.ac.uk>
+    Author: Peter Boyle <paboyle@ph.ed.ac.uk>
+    Author: paboyle <paboyle@ph.ed.ac.uk>
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -24,8 +24,8 @@ Author: paboyle <paboyle@ph.ed.ac.uk>
     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
     See the full license in the file "LICENSE" in the top level distribution directory
-    *************************************************************************************/
-    /*  END LEGAL */
+*************************************************************************************/
+/*  END LEGAL */
 #include <Grid/Grid.h>
 
 
@@ -65,16 +65,13 @@ int main(int argc, char **argv) {
   TheHMC.Resources.LoadBinaryCheckpointer(CPparams);
 
   RNGModuleParameters RNGpar;
-  RNGpar.SerialSeed = {1,2,3,4,5};
-  RNGpar.ParallelSeed = {6,7,8,9,10};
+  RNGpar.serial_seeds = "1 2 3 4 5";
+  RNGpar.parallel_seeds = "6 7 8 9 10";
   TheHMC.Resources.SetRNGSeeds(RNGpar);
 
   // Construct observables
-  // here there is too much indirection 
-  PlaquetteObsParameters PlPar;
-  PlPar.output_prefix = "Plaquette";
-  PlaquetteMod<HMCWrapper::ImplPolicy> PlaqModule(PlPar);
-  TheHMC.Resources.AddObservable(&PlaqModule);
+  typedef PlaquetteMod<HMCWrapper::ImplPolicy> PlaqObs;
+  TheHMC.Resources.AddObservable<PlaqObs>();
   //////////////////////////////////////////////
 
   /////////////////////////////////////////////////////////////

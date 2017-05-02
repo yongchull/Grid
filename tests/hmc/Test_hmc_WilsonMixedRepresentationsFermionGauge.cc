@@ -77,16 +77,13 @@ int main(int argc, char **argv) {
   TheHMC.Resources.LoadBinaryCheckpointer(CPparams);
 
   RNGModuleParameters RNGpar;
-  RNGpar.SerialSeed = {1,2,3,4,5};
-  RNGpar.ParallelSeed = {6,7,8,9,10};
+  RNGpar.serial_seeds = "1 2 3 4 5";
+  RNGpar.parallel_seeds = "6 7 8 9 10";
   TheHMC.Resources.SetRNGSeeds(RNGpar);
 
   // Construct observables
-  // here there is too much indirection 
-  PlaquetteObsParameters PlPar;
-  PlPar.output_prefix = "Plaquette";
-  PlaquetteMod<HMCWrapper::ImplPolicy> PlaqModule(PlPar);
-  TheHMC.Resources.AddObservable(&PlaqModule);
+  typedef PlaquetteMod<HMCWrapper::ImplPolicy> PlaqObs;
+  TheHMC.Resources.AddObservable<PlaqObs>();
   //////////////////////////////////////////////
 
   /////////////////////////////////////////////////////////////
