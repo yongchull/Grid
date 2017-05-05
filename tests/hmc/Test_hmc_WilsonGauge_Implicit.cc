@@ -30,6 +30,19 @@ directory
 /*  END LEGAL */
 #include <Grid/Grid.h>
 
+namespace Grid{
+struct RMHMCActionParameters: Serializable {
+  GRID_SERIALIZABLE_CLASS_MEMBERS(RMHMCActionParameters,
+				  double, gauge_beta)
+
+  template <class ReaderClass >
+  RMHMCActionParameters(Reader<ReaderClass>& Reader){
+    read(Reader, "Action", *this);
+  }
+
+};
+}
+
 int main(int argc, char **argv) {
   using namespace Grid;
   using namespace Grid::QCD;
@@ -41,56 +54,85 @@ int main(int argc, char **argv) {
 
    // Typedefs to simplify notation
   typedef GenericHMCRunner<ImplicitLeapFrog> HMCWrapper;  // Uses the default minimum norm
+   // Serialiser
+  typedef Grid::JSONReader       Serialiser;
+
+
   HMCWrapper TheHMC;
+  TheHMC.ReadCommandLine(argc, argv); // these can be parameters from file
+  
+  // Reader, file should come from command line
+  if (TheHMC.ParameterFile.empty()){
+    std::cout << "Input file not specified."
+              << "Use --ParameterFile option in the command line.\nAborting" 
+              << std::endl;
+    exit(1);
+  }
+  Serialiser Reader(TheHMC.ParameterFile);
+
+  RMHMCActionParameters ActionParams(Reader);  
 
   // Grid from the command line
   TheHMC.Resources.AddFourDimGrid("gauge");
-  // Possibile to create the module by hand 
-  // hardcoding parameters or using a Reader
-
+ 
 
   // Checkpointer definition
-  CheckpointerParameters CPparams;  
-  CPparams.config_prefix = "ckpoint_lat";
-  CPparams.rng_prefix = "ckpoint_rng";
-  CPparams.saveInterval = 10;
-  CPparams.format = "IEEE64BIG";
-  
+  CheckpointerParameters CPparams(Reader);
   TheHMC.Resources.LoadBinaryCheckpointer(CPparams);
 
-  RNGModuleParameters RNGpar;
-  RNGpar.serial_seeds = "1 2 3 4 5";
-  RNGpar.parallel_seeds = "6 7 8 9 10";
+  RNGModuleParameters RNGpar(Reader);
   TheHMC.Resources.SetRNGSeeds(RNGpar);
 
   // Construct observables
   typedef PlaquetteMod<HMCWrapper::ImplPolicy> PlaqObs;
   TheHMC.Resources.AddObservable<PlaqObs>();
-  //////////////////////////////////////////////
-
-  //////////////////////////////////////////////
-
   /////////////////////////////////////////////////////////////
-  // Collect actions, here use more encapsulation
-  // need wrappers of the fermionic classes 
-  // that have a complex construction
-  // standard
-  RealD beta = 5.6;
-  WilsonGaugeActionR Waction(beta);
+  // Collect actions
+  WilsonGaugeActionR Waction(ActionParams.gauge_beta);
   
   ActionLevel<HMCWrapper::Field> Level1(1);
   Level1.push_back(&Waction);
-  //Level1.push_back(WGMod.getPtr());
   TheHMC.TheAction.push_back(Level1);
   /////////////////////////////////////////////////////////////
-
-  // HMC parameters are serialisable 
-  TheHMC.Parameters.MD.MDsteps = 40;
-  TheHMC.Parameters.MD.trajL   = 1.0;
-
-  TheHMC.ReadCommandLine(argc, argv); // these can be parameters from file
-  TheHMC.Run();  // no smearing
+  TheHMC.Parameters.initialize(Reader);
+  TheHMC.Run(); 
 
   Grid_finalize();
 
 } // main
+
+/* Examples for input files
+
+JSON
+
+{
+    "Checkpointer": {
+    "config_prefix": "ckpoint_json_lat",
+    "rng_prefix": "ckpoint_json_rng",
+    "saveInterval": 1,
+    "format": "IEEE64BIG"
+    },
+    "RandomNumberGenerator": {
+    "serial_seeds": "1 2 3 4 6",
+    "parallel_seeds": "6 7 8 9 11"
+    },
+    "Action":{
+    "gauge_beta": 5.6
+    },
+    "HMC":{
+    "StartTrajectory": 0,
+    "Trajectories": 100,
+    "MetropolisTest": true,
+    "NoMetropolisUntil": 10,
+    "StartingType": "HotStart",
+    "MD":{
+        "name": "MinimumNorm2",
+      	"MDsteps": 15,
+	      "trajL": 2.0
+	  }
+}
+}
+
+XML example not provided yet
+
+*/
