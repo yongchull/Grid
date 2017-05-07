@@ -154,8 +154,7 @@ void M(const GaugeField& in, GaugeField& out) {
     typedef typename std::remove_const<typename std::remove_reference<decltype(in._odata[0](0))>::type>::type  internal_type;
     laplace_stencil.HaloExchange(in, compressor);
     
-    PARALLEL_FOR_LOOP
-    for (int i = 0; i < in._grid->oSites(); i++) {
+    parallel_for (int i = 0; i < in._grid->oSites(); i++) {
       int permute_type;
       StencilEntry *SEup, *SEdown;
       internal_type temp2, *temp;

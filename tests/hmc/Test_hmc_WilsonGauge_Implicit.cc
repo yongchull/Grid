@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
   // need wrappers of the fermionic classes 
   // that have a complex construction
   // standard
-  RealD beta = 5.6;
+  RealD beta = 6.0;
   WilsonGaugeActionR Waction(beta);
   
   ActionLevel<HMCWrapper::Field> Level1(1);
@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
   /////////////////////////////////////////////////////////////
 
   // HMC parameters are serialisable 
-  TheHMC.Parameters.MD.MDsteps = 40;
+  TheHMC.Parameters.MD.MDsteps = 80;
   TheHMC.Parameters.MD.trajL   = 1.0;
 
   TheHMC.ReadCommandLine(argc, argv); // these can be parameters from file
