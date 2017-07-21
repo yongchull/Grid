@@ -45,19 +45,8 @@ int main (int argc, char ** argv)
   GridRedBlackCartesian * UrbGrid = SpaceTimeGrid::makeFourDimRedBlackGrid(UGrid);
   GridCartesian         * FGrid   = SpaceTimeGrid::makeFiveDimGrid(Ls,UGrid);
   GridRedBlackCartesian * FrbGrid = SpaceTimeGrid::makeFiveDimRedBlackGrid(Ls,UGrid);
-  
-  // Want a different conf at every run
-  // First create an instance of an engine.
-  std::random_device rnd_device;
-  // Specify the engine and distribution.
-  std::mt19937 mersenne_engine(rnd_device());
-  std::uniform_int_distribution<int> dist(1, 100);
-  
-  auto gen = std::bind(dist, mersenne_engine);
-  std::vector<int> seeds4(4);
-  generate(begin(seeds4), end(seeds4), gen);
-  
-  //std::vector<int> seeds4({1,2,3,5});
+
+  std::vector<int> seeds4({1,2,3,4});
   std::vector<int> seeds5({5,6,7,8});
   GridParallelRNG          RNG5(FGrid);  RNG5.SeedFixedIntegers(seeds5);
   GridParallelRNG          RNG4(UGrid);  RNG4.SeedFixedIntegers(seeds4);
@@ -78,7 +67,23 @@ int main (int argc, char ** argv)
   ////////////////////////////////////
   RealD mass=0.01; 
   RealD M5=1.8; 
-  DomainWallFermionR Ddwf(U,*FGrid,*FrbGrid,*UGrid,*UrbGrid,mass,M5);
+  RealD b=0.5;
+  RealD c=0.5;
+
+  std::vector < std::complex<double>  > omegas;
+  omegas.push_back( std::complex<double>(1.45806438985048,-0) );
+  omegas.push_back( std::complex<double>(1.18231318389348,-0) );
+  omegas.push_back( std::complex<double>(0.830951166685955,-0) );
+  omegas.push_back( std::complex<double>(0.542352409156791,-0) );
+  omegas.push_back( std::complex<double>(0.341985020453729,-0) );
+  omegas.push_back( std::complex<double>(0.21137902619029,-0) );
+  omegas.push_back( std::complex<double>(0.126074299502912,-0) );
+  omegas.push_back( std::complex<double>(0.0990136651962626,-0) );
+  omegas.push_back( std::complex<double>(0.0686324988446592,0.0550658530827402) );
+  omegas.push_back( std::complex<double>(0.0686324988446592,-0.0550658530827402) );
+
+  ZMobiusFermionR Ddwf(U, *FGrid, *FrbGrid, *UGrid, *UrbGrid, mass, M5, omegas,b,c);
+
   Ddwf.M   (phi,Mphi);
 
   ComplexD S    = innerProduct(Mphi,Mphi); // pdag MdagM p
@@ -157,7 +162,7 @@ int main (int argc, char ** argv)
   std::cout << GridLogMessage << "dS      "<<Sprime-S<<std::endl;
   std::cout << GridLogMessage << "predict dS    "<< dSpred <<std::endl;
 
-  assert( fabs(real(Sprime-S-dSpred)) < 1.0 ) ;
+  assert( fabs(real(Sprime-S-dSpred)) < 3.0 ) ;
 
   std::cout<< GridLogMessage << "Done" <<std::endl;
   Grid_finalize();
