@@ -94,19 +94,21 @@ class PlaquetteMod: public ObservableModule<PlaquetteLogger<Impl>, NoParameters>
   PlaquetteMod(): ObsBase(NoParameters()){}
 };
 
+
+
+
+
 template < class Impl >
-class TopologicalChargeMod: public ObservableModule<TopologicalCharge<Impl>, NoParameters>{
-  typedef ObservableModule<TopologicalCharge<Impl>, NoParameters> ObsBase;
+class TopologicalChargeMod: public ObservableModule<TopologicalCharge<Impl>, TopologyObsParameters>{
+  typedef ObservableModule<TopologicalCharge<Impl>, TopologyObsParameters> ObsBase;
   using ObsBase::ObsBase; // for constructors
-
-
 
   // acquire resource
   virtual void initialize(){
-    this->ObservablePtr.reset(new TopologicalCharge<Impl>());
+    this->ObservablePtr.reset(new TopologicalCharge<Impl>(this->Par_));
   }
   public:
-  TopologicalChargeMod(): ObsBase(NoParameters()){}
+  TopologicalChargeMod(TopologyObsParameters Par): ObsBase(Par){}
 };
 
 
