@@ -39,8 +39,8 @@ namespace QCD {
 
 class IntegratorParameters: Serializable {
 public:
-        GRID_SERIALIZABLE_CLASS_MEMBERS(IntegratorParameters,
-                std::string, name,      // name of the integrator
+  GRID_SERIALIZABLE_CLASS_MEMBERS(IntegratorParameters,
+    std::string, name,      // name of the integrator
     unsigned int, MDsteps,  // number of outer steps
     RealD, trajL,           // trajectory length
   )
@@ -179,7 +179,7 @@ class Integrator {
 
     MomentaField NewMom = P.Mom;
     MomentaField OldMom = P.Mom;
-    double threshold = 1e-6;
+    double threshold = 1e-8;
     P.M.ImportGauge(U);
     MomentaField MomDer(P.Mom._grid);
     MomentaField MomDer1(P.Mom._grid);
@@ -264,21 +264,18 @@ class Integrator {
     P.M.ImportGauge(U);
     P.DerivativeP(Mom1); // first term in the derivative 
 
- 
     P.update_auxiliary_fields(ep*0.5);
-
 
     do {
       std::cout << GridLogIntegrator << "UpdateU implicit step "<< counter << std::endl;
       
       P.DerivativeP(Mom2); // second term in the derivative, on the updated U
       MomentaField sum = (Mom1 + Mom2);
-      //std::cout << GridLogMessage << "sum Norm " << norm2(sum) << std::endl;
 
       for (int mu = 0; mu < Nd; mu++) {
         auto Umu = PeekIndex<LorentzIndex>(U, mu);
         auto Pmu = PeekIndex<LorentzIndex>(sum, mu);
-        Umu = expMat(Pmu, ep * 0.5, 24) * Umu;
+        Umu = expMat(Pmu, ep * 0.5, 12) * Umu;
         PokeIndex<LorentzIndex>(NewU, ProjectOnGroup(Umu), mu);
       }
 
@@ -292,9 +289,7 @@ class Integrator {
     } while (RelativeError > threshold && counter < MaxCounter);
 
     U = NewU;
-
     P.update_auxiliary_fields(ep*0.5);
-
   }
 
 

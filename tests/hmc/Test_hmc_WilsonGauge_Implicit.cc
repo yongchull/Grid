@@ -39,7 +39,6 @@ struct RMHMCActionParameters: Serializable {
   RMHMCActionParameters(Reader<ReaderClass>& Reader){
     read(Reader, "Action", *this);
   }
-
 };
 }
 
@@ -85,7 +84,10 @@ int main(int argc, char **argv) {
 
   // Construct observables
   typedef PlaquetteMod<HMCWrapper::ImplPolicy> PlaqObs;
+  typedef TopologicalChargeMod<HMCWrapper::ImplPolicy> QObs;
   TheHMC.Resources.AddObservable<PlaqObs>();
+  TopologyObsParameters TopParams(Reader);
+  TheHMC.Resources.AddObservable<QObs>(TopParams);
   /////////////////////////////////////////////////////////////
   // Collect actions
   WilsonGaugeActionR Waction(ActionParams.gauge_beta);
@@ -108,31 +110,42 @@ JSON
 
 {
     "Checkpointer": {
-    "config_prefix": "ckpoint_json_lat",
-    "rng_prefix": "ckpoint_json_rng",
-    "saveInterval": 1,
-    "format": "IEEE64BIG"
+	"config_prefix": "ckpoint_json_lat",
+	"rng_prefix": "ckpoint_json_rng",
+	"saveInterval": 10,
+	"format": "IEEE64BIG"
     },
     "RandomNumberGenerator": {
-    "serial_seeds": "1 2 3 4 6",
-    "parallel_seeds": "6 7 8 9 11"
+	"serial_seeds": "1 2 3 4 6",
+	"parallel_seeds": "55 7 8 9 11"
     },
     "Action":{
-    "gauge_beta": 5.6
+	"gauge_beta": 5.8
+    },
+    "TopologyMeasurement":{
+	"interval": 1,
+	"do_smearing": true,
+	"Smearing":{
+	    "steps": 200,
+	    "step_size": 0.01,
+	    "meas_interval": 50,
+	    "maxTau": 2.0
+	}
     },
     "HMC":{
-    "StartTrajectory": 0,
-    "Trajectories": 100,
-    "MetropolisTest": true,
-    "NoMetropolisUntil": 10,
-    "StartingType": "HotStart",
-    "MD":{
-        "name": "MinimumNorm2",
-      	"MDsteps": 15,
-	      "trajL": 2.0
-	  }
+	"StartTrajectory": 0,
+	"Trajectories": 10,
+	"MetropolisTest": true,
+	"NoMetropolisUntil": 10,
+	"StartingType": "HotStart",
+	"MD":{
+	    "name": "MinimumNorm2",
+	    "MDsteps": 40,
+	    "trajL": 1.0
+	}
+    }
 }
-}
+
 
 XML example not provided yet
 
