@@ -42,6 +42,7 @@ Author: Peter Boyle <paboyle@ph.ed.ac.uk>
 
 namespace Grid {
 
+
   class PointerCache {
   private:
 
@@ -51,85 +52,155 @@ namespace Grid {
     typedef struct { 
       void *address;
       size_t bytes;
-      int valid;
+      bool valid;
     } PointerCacheEntry;
     
     static PointerCacheEntry Entries[Ncache];
 
   public:
+    static long int TotalAlignedAllocatedBytes;
 
+    typedef struct {
+      void *address;
+      size_t bytes;
+    } PointerInfo;
 
-    static void *Insert(void *ptr,size_t bytes) ;
+    static PointerInfo Insert(void *ptr,size_t bytes) ;
     static void *Lookup(size_t bytes) ;
 
+    static size_t allocated_size(){
+      size_t bytes = 0;
+      for (int e = 0; e < Ncache; e++){
+          bytes += Entries[e].bytes;
+      }
+      return bytes;
+    }
+
+    static void clean()
+    {
+      // Check that the remaining allocated bytes matches with the cache content
+      if (allocated_size() != TotalAlignedAllocatedBytes)
+      {
+        std::cout << GridLogError << "Memory leaked in the alignedAllocator " << std::endl;
+      } else {
+        std::cout << GridLogMessage << "Cleaning cache for the alignedAllocator " << std::endl;      
+      }
+      // Free the cache content
+      for (uint8_t e = 0; e != Ncache; e++)
+      {
+        if (Entries[e].valid)
+        {
+#ifdef HAVE_MM_MALLOC_H
+          _mm_free((void *)Entries[e].address);
+#else
+          free((void *)Entries[e].address);
+#endif
+        }
+      }
+    }
+    // here create a function to erase the cache and then call from Grid_free.
   };
+
 
 ////////////////////////////////////////////////////////////////////
 // A lattice of something, but assume the something is SIMDized.
 ////////////////////////////////////////////////////////////////////
 
-template<typename _Tp>
-class alignedAllocator {
-public: 
-  typedef std::size_t     size_type;
-  typedef std::ptrdiff_t  difference_type;
-  typedef _Tp*       pointer;
-  typedef const _Tp* const_pointer;
-  typedef _Tp&       reference;
-  typedef const _Tp& const_reference;
-  typedef _Tp        value_type;
+  template <typename _Tp>
+  class alignedAllocator
+  {
+  public:
+    typedef std::size_t size_type;
+    typedef std::ptrdiff_t difference_type;
+    typedef _Tp *pointer;
+    typedef const _Tp *const_pointer;
+    typedef _Tp &reference;
+    typedef const _Tp &const_reference;
+    typedef _Tp value_type;
 
-  template<typename _Tp1>  struct rebind { typedef alignedAllocator<_Tp1> other; };
-  alignedAllocator() throw() { }
-  alignedAllocator(const alignedAllocator&) throw() { }
-  template<typename _Tp1> alignedAllocator(const alignedAllocator<_Tp1>&) throw() { }
-  ~alignedAllocator() throw() { }
-  pointer       address(reference __x)       const { return &__x; }
-  size_type  max_size() const throw() { return size_t(-1) / sizeof(_Tp); }
+    template <typename _Tp1>
+    struct rebind
+    {
+      typedef alignedAllocator<_Tp1> other;
+    };
+    alignedAllocator() throw() {}
+    alignedAllocator(const alignedAllocator &) throw() {}
+    template <typename _Tp1>
+    alignedAllocator(const alignedAllocator<_Tp1> &) throw() {}
+    ~alignedAllocator() throw() {}
+    pointer address(reference __x) const { return &__x; }
+    size_type max_size() const throw() { return size_t(-1) / sizeof(_Tp); }
 
-  pointer allocate(size_type __n, const void* _p= 0)
-  { 
-    size_type bytes = __n*sizeof(_Tp);
+    pointer allocate(size_type __n, const void *_p = 0)
+    {
+      size_type bytes = __n * sizeof(_Tp);
 
-    _Tp *ptr = (_Tp *) PointerCache::Lookup(bytes);
-    
+      _Tp *ptr = (_Tp *)PointerCache::Lookup(bytes);
+
+
 #ifdef HAVE_MM_MALLOC_H
-    if ( ptr == (_Tp *) NULL ) ptr = (_Tp *) _mm_malloc(bytes,128);
+      if (ptr == (_Tp *)NULL)
+      {
+        ptr = (_Tp *)_mm_malloc(bytes, 128);
+        PointerCache::TotalAlignedAllocatedBytes += bytes;
+        //std::cout << "Allocating " << bytes << " bytes. Total bytes: " << TotalAlignedAllocatedBytes << std::endl;
+        // throw exception if failing
+      }
 #else
-    if ( ptr == (_Tp *) NULL ) ptr = (_Tp *) memalign(128,bytes);
+      if (ptr == (_Tp *)NULL)
+        ptr = (_Tp *)memalign(128, bytes);
 #endif
-    // First touch optimise in threaded loop
-    uint8_t *cp = (uint8_t *)ptr;
+
+      // First touch optimise in threaded loop
+      uint8_t *cp = (uint8_t *)ptr;
 #ifdef GRID_OMP
 #pragma omp parallel for
 #endif
-    for(size_type n=0;n<bytes;n+=4096){
-      cp[n]=0;
+      for (size_type n = 0; n < bytes; n += 4096)
+      {
+        cp[n] = 0;
+      }
+      return ptr;
     }
-    return ptr;
-  }
 
-  void deallocate(pointer __p, size_type __n) { 
-    size_type bytes = __n * sizeof(_Tp);
-    pointer __freeme = (pointer)PointerCache::Insert((void *)__p,bytes);
+    void deallocate(pointer __p, size_type __n)
+    {
+      size_type bytes = __n * sizeof(_Tp);
+      //pointer __freeme = (pointer)PointerCache::Insert((void *)__p, bytes);
+      PointerCache::PointerInfo pinfo = PointerCache::Insert((void *)__p, bytes);
+      pointer __freeme = (pointer)pinfo.address;
 
 #ifdef HAVE_MM_MALLOC_H
-    if ( __freeme ) _mm_free((void *)__freeme); 
+      if (__freeme) {
+        _mm_free((void *)__freeme);
+        PointerCache::TotalAlignedAllocatedBytes -= pinfo.bytes;
+        //std::cout << "Dellocating " << pinfo.bytes << " bytes. Total bytes: " << TotalAlignedAllocatedBytes << std::endl;        
+      }
 #else
-    if ( __freeme ) free((void *)__freeme);
+      if (__freeme)
+        free((void *)__freeme);
 #endif
-  }
-  void construct(pointer __p, const _Tp& __val) { };
-  void construct(pointer __p) { };
-  void destroy(pointer __p) { };
-};
-template<typename _Tp>  inline bool operator==(const alignedAllocator<_Tp>&, const alignedAllocator<_Tp>&){ return true; }
-template<typename _Tp>  inline bool operator!=(const alignedAllocator<_Tp>&, const alignedAllocator<_Tp>&){ return false; }
+      //std::cout << "Bytes in cache: "<< PointerCache::allocated_size() << std::endl;
+    }
+    void construct(pointer __p, const _Tp &__val){
+      void * const pv = static_cast<void *>(__p);
+			new (pv) _Tp(__val);
+    };
 
-//////////////////////////////////////////////////////////////////////////////////////////
-// MPI3 : comms must use shm region
-// SHMEM: comms must use symmetric heap
-//////////////////////////////////////////////////////////////////////////////////////////
+    void construct(pointer __p){};
+
+    void destroy(pointer __p){__p->~_Tp(); };
+  };
+
+  template <typename _Tp>
+  inline bool operator==(const alignedAllocator<_Tp> &, const alignedAllocator<_Tp> &) { return true; }
+  template <typename _Tp>
+  inline bool operator!=(const alignedAllocator<_Tp> &, const alignedAllocator<_Tp> &) { return false; }
+
+  //////////////////////////////////////////////////////////////////////////////////////////
+  // MPI3 : comms must use shm region
+  // SHMEM: comms must use symmetric heap
+  //////////////////////////////////////////////////////////////////////////////////////////
 #ifdef GRID_COMMS_SHMEM
 extern "C" { 
 #include <mpp/shmem.h>
