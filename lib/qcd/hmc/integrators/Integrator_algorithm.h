@@ -400,7 +400,7 @@ class ImplicitMinimumNorm2 : public Integrator<FieldImplementation, SmearingPoli
         this->step(U, level + 1, first_step, 0);
       }
 
-      this->implicit_update_P(U, level, (1.0 - 2.0 * lambda) * eps);
+      this->implicit_update_P(U, level, (1.0 - 2.0 * lambda) * eps, true);
 
       if (level == fl) {  // lowest level
         this->implicit_update_U(U, 0.5 * eps);
@@ -414,7 +414,7 @@ class ImplicitMinimumNorm2 : public Integrator<FieldImplementation, SmearingPoli
       if (last_step) {
         this->update_P(U, level, eps * lambda);
       } else {
-        this->implicit_update_P(U, level, lambda * eps*2.0);
+        this->implicit_update_P(U, level, lambda * eps*2.0, true);
       }
     }
   }

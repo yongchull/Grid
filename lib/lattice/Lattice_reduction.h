@@ -37,7 +37,7 @@ template<class vobj> inline RealD norm2(const Lattice<vobj> &arg){
   return std::real(nrm); 
 }
 
-// Double inner product
+// Double precision inner product
 template<class vobj>
 inline ComplexD innerProduct(const Lattice<vobj> &left,const Lattice<vobj> &right) 
 {
@@ -49,7 +49,7 @@ inline ComplexD innerProduct(const Lattice<vobj> &left,const Lattice<vobj> &righ
   
   std::vector<vector_type,alignedAllocator<vector_type> > sumarray(grid->SumArraySize());
   
-  parallel_for(int thr=0;thr<grid->SumArraySize();thr++){
+  parallel_for(uint thr=0; thr < grid->SumArraySize();thr++){
     int nwork, mywork, myoff;
     GridThread::GetWork(left._grid->oSites(),thr,mywork,myoff);
     
@@ -61,12 +61,14 @@ inline ComplexD innerProduct(const Lattice<vobj> &left,const Lattice<vobj> &righ
   }
   
   vector_type vvnrm; vvnrm=zero;  // sum across threads
-  for(int i=0;i<grid->SumArraySize();i++){
-    vvnrm = vvnrm+sumarray[i];
+  for(uint i=0;i != grid->SumArraySize() ; ++i){
+    vvnrm += sumarray[i];
   } 
+
   nrm = Reduce(vvnrm);// sum across simd
   right._grid->GlobalSum(nrm);
   return nrm;
+
 }
  
 template<class Op,class T1>
