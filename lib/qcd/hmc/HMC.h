@@ -57,6 +57,7 @@ struct HMCparameters: Serializable {
                                   bool, MetropolisTest,
                                   Integer, NoMetropolisUntil,
                                   std::string, StartingType,
+                                  double, RMHMC_kappa,
                                   IntegratorParameters, MD)
 
   HMCparameters() {
@@ -66,6 +67,7 @@ struct HMCparameters: Serializable {
     StartTrajectory   = 0;
     Trajectories      = 10;
     StartingType      = "HotStart";
+    RMHMC_kappa       = 0.0;
     /////////////////////////////////
   }
 
@@ -87,6 +89,7 @@ struct HMCparameters: Serializable {
     std::cout << GridLogMessage << "[HMC parameters] Metropolis test (on/off): " << std::boolalpha << MetropolisTest << "\n";
     std::cout << GridLogMessage << "[HMC parameters] Thermalization trajs    : " << NoMetropolisUntil << "\n";
     std::cout << GridLogMessage << "[HMC parameters] Starting type           : " << StartingType << "\n";
+    std::cout << GridLogMessage << "[HMC parameters] RMHMC kappa             : " << RMHMC_kappa << "\n";
     MD.print_parameters();
   }
   

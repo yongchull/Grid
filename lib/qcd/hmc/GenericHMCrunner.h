@@ -148,7 +148,7 @@ class HMCWrapperTemplate: public HMCRunnerBase<ReaderClass> {
     ConjugateGradient<LatticeGaugeField> CG(1.0e-8,10000);
     LaplacianParams LapPar(0.0001, 1.0, 1000, 1e-8, 12, 64);
     //RealD Kappa = 0.6;
-    RealD Kappa = 0.9; // ypj [test]
+    RealD Kappa = Parameters.RMHMC_kappa; // ypj [add]
 
     // Better to pass the generalised momenta to the integrator
     LaplacianAdjointField<PeriodicGimplR> Laplacian(UGrid, CG, LapPar, Kappa);
