@@ -38,6 +38,8 @@ class WilsonFlow: public Smear<Gimpl>{
     unsigned int Nstep;
     unsigned int measure_interval;
     mutable RealD epsilon, taus;
+    RealD epsilon_evolved;
+    RealD epsilon_max;
 
 
     mutable WilsonGaugeAction<Gimpl> SG;
@@ -52,6 +54,7 @@ class WilsonFlow: public Smear<Gimpl>{
     explicit WilsonFlow(unsigned int Nstep, RealD epsilon, unsigned int interval = 1):
         Nstep(Nstep),
         epsilon(epsilon),
+        epsilon_max(10.0*epsilon),  // ypj [add] set a bound for adaptive step size
         measure_interval(interval),
         SG(WilsonGaugeAction<Gimpl>(3.0)) {
             // WilsonGaugeAction with beta 3.0
@@ -108,6 +111,7 @@ void WilsonFlow<Gimpl>::evolve_step_adaptive(typename Gimpl::GaugeField &U, Real
     if (maxTau - taus < epsilon){
         epsilon = maxTau-taus;
     }
+    epsilon_evolved = epsilon;
     //std::cout << GridLogMessage << "Integration epsilon : " << epsilon << std::endl;
     GaugeField Z(U._grid);
     GaugeField Zprime(U._grid);
@@ -140,7 +144,8 @@ void WilsonFlow<Gimpl>::evolve_step_adaptive(typename Gimpl::GaugeField &U, Real
     taus += epsilon;
     //std::cout << GridLogMessage << "Adjusting integration step with distance: " << diff << std::endl;
     
-    epsilon = epsilon*0.95*std::pow(1e-4/diff,1./3.);
+    //epsilon = epsilon*0.95*std::pow(1e-4/diff,1./3.);
+    epsilon = std::min(epsilon_max, epsilon*0.95*std::pow(1e-4/diff,1./3.));
     //std::cout << GridLogMessage << "New epsilon : " << epsilon << std::endl;
 
 }
@@ -164,22 +169,26 @@ RealD WilsonFlow<Gimpl>::energyDensityPlaquette(const GaugeField& U) const {
 template <class Gimpl>
 void WilsonFlow<Gimpl>::smear(GaugeField& out, const GaugeField& in) const {
     out = in;
+    std::streamsize current_precision = std::cout.precision();
     for (unsigned int step = 1; step <= Nstep; step++) {
         auto start = std::chrono::high_resolution_clock::now();
         evolve_step(out);
         auto end = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> diff = end - start;
         #ifdef WF_TIMING
-        std::cout << "Time to evolve " << diff.count() << " s\n";
+        std::cout << GridLogMessage << "Time to evolve " << diff.count() << " s\n";
         #endif
+        std::cout.precision(8);
         std::cout << GridLogMessage << "[WilsonFlow] Energy density (plaq) : "
             << step << "  "
+            << epsilon << "  "
             << energyDensityPlaquette(step,out) << std::endl;
          if( step % measure_interval == 0){
          std::cout << GridLogMessage << "[WilsonFlow] Top. charge           : "
             << step << "  " 
             << WilsonLoops<PeriodicGimplR>::TopologicalCharge(out) << std::endl;
         }
+        std::cout.precision(current_precision);
     }
 }
 
@@ -188,21 +197,33 @@ void WilsonFlow<Gimpl>::smear_adaptive(GaugeField& out, const GaugeField& in, Re
     out = in;
     taus = epsilon;
     unsigned int step = 0;
+    
+    std::streamsize current_precision = std::cout.precision();
+    
+    auto start = std::chrono::high_resolution_clock::now();
+    
     do{
         step++;
         //std::cout << GridLogMessage << "Evolution time :"<< taus << std::endl;
         evolve_step_adaptive(out, maxTau);
+        std::cout.precision(8);
         std::cout << GridLogMessage << "[WilsonFlow] Energy density (plaq) : "
             << step << "  "
+            << epsilon_evolved << "  "
             << energyDensityPlaquette(out) << std::endl;
          if( step % measure_interval == 0){
          std::cout << GridLogMessage << "[WilsonFlow] Top. charge           : "
-            << step << "  " 
+            << step << "  "
             << WilsonLoops<PeriodicGimplR>::TopologicalCharge(out) << std::endl;
         }
+        std::cout.precision(current_precision);
     } while (taus < maxTau);
-
-
+    
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> diff = end - start;
+    //#ifdef WF_TIMING
+    std::cout << GridLogMessage << "[WilsonFlow] Time to evolve " << diff.count() << " s\n";
+    //#endif
 
 }
 

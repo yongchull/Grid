@@ -214,7 +214,8 @@ class HybridMonteCarlo {
       DeltaH = evolve_hmc_step(Ucopy);
       // Metropolis-Hastings test
       bool accept = true;
-      if (traj >= Params.StartTrajectory + Params.NoMetropolisUntil) {
+      if ( Params.MetropolisTest &&
+           (traj >= Params.StartTrajectory + Params.NoMetropolisUntil) ) {
         accept = metropolis_test(DeltaH);
       } else {
       	std::cout << GridLogMessage << "Skipping Metropolis test" << std::endl;
