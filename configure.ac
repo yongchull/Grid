@@ -242,6 +242,9 @@ case ${ax_cv_cxx_compiler_vendor} in
       AVX512)
         AC_DEFINE([AVX512],[1],[AVX512 intrinsics])
         SIMD_FLAGS='-mavx512f -mavx512pf -mavx512er -mavx512cd';;
+      SKL)
+        AC_DEFINE([AVX512],[1],[AVX512 intrinsics for SkyLake Xeon])
+        SIMD_FLAGS='-march=skylake-avx512';;
       KNC)
         AC_DEFINE([IMCI],[1],[IMCI intrinsics for Knights Corner])
         SIMD_FLAGS='';;
@@ -305,7 +308,7 @@ AM_CXXFLAGS="$SIMD_FLAGS $AM_CXXFLAGS"
 AM_CFLAGS="$SIMD_FLAGS $AM_CFLAGS"
 
 case ${ac_SIMD} in
-  AVX512|KNL)
+  AVX512|SKL|KNL)
     AC_DEFINE([TEST_ZMM],[1],[compile ZMM test]);;
   *)
 	;;
