@@ -368,7 +368,51 @@ class ImplicitMinimumNorm2 : public Integrator<FieldImplementation, SmearingPoli
                ActionSet<Field, RepresentationPolicy>& Aset, SmearingPolicy& Sm, Metric<Field>& M)
       : Integrator<FieldImplementation, SmearingPolicy, RepresentationPolicy>(
             grid, Par, Aset, Sm, M){};
+#if 1 // ypj [test] the easiest hack to compile HMC test routines
+  std::string integrator_name(){return "MinimumNorm2 via ImplicitMininumNorm2";}
+  
+  void step(Field& U, int level, int _first, int _last) {
+    // level  : current level
+    // fl     : final level
+    // eps    : current step size
 
+    int fl = this->as.size() - 1;
+
+    RealD eps = this->Params.trajL/this->Params.MDsteps * 2.0;
+    for (int l = 0; l <= level; ++l) eps /= 2.0 * this->as[l].multiplier;
+
+    // Nesting:  2xupdate_U of size eps/2
+    // Next level is eps/2/multiplier
+
+    int multiplier = this->as[level].multiplier;
+    for (int e = 0; e < multiplier; ++e) {  // steps per step
+
+      int first_step = _first && (e == 0);
+      int last_step = _last && (e == multiplier - 1);
+
+      if (first_step) {  // initial half step
+        this->update_P(U, level, lambda * eps);
+      }
+
+      if (level == fl) {  // lowest level
+        this->update_U(U, 0.5 * eps);
+      } else {  // recursive function call
+        this->step(U, level + 1, first_step, 0);
+      }
+
+      this->update_P(U, level, (1.0 - 2.0 * lambda) * eps);
+
+      if (level == fl) {  // lowest level
+        this->update_U(U, 0.5 * eps);
+      } else {  // recursive function call
+        this->step(U, level + 1, 0, last_step);
+      }
+
+      int mm = (last_step) ? 1 : 2;
+      this->update_P(U, level, lambda * eps * mm);
+    }
+  }
+#else
   std::string integrator_name(){return "ImplicitMininumNorm2";}
 
   void step(Field& U, int level, int _first, int _last) {
@@ -418,6 +462,7 @@ class ImplicitMinimumNorm2 : public Integrator<FieldImplementation, SmearingPoli
       }
     }
   }
+#endif
 };
 
 
