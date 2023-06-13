@@ -96,6 +96,7 @@ Documentation/_build
 build.sh
 .vscode
 *.code-workspace
+tags
 
 # Eigen source #
 ################
